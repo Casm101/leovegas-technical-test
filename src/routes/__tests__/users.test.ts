@@ -55,7 +55,6 @@ describe("Create new user on / with post method", () => {
     // Should fail to store data in DB becuase of validation
     // Should respond with status code 400
     test("Bad name - Should respond with 400", async () => {
-
       const response = await request(app)
         .post('/users')
         .send({
@@ -72,14 +71,13 @@ describe("Create new user on / with post method", () => {
   });
 });
 
-// Get existing user test
+// Get existing user tests
 describe("Get user on /:id with get method", () => {
 
   /* Define passing tests */
   describe("Shoud pass when", () => {
 
     test("When given an existing user ID - Should respond with 200", async () => {
-
       const response = await request(app)
         .get(`/users/${createdId}`)
         .set('Authorization', `Bearer ${createdAccessToken}`);
@@ -99,7 +97,6 @@ describe("Get user on /:id with get method", () => {
   describe("Should fail when", () => {
 
     test("When given a non-existant user ID - Should respond with 404", async () => {
-
       const response = await request(app)
         .get(`/users/1234-4567-890A`)
         .set('Authorization', `Bearer ${createdAccessToken}`);
@@ -111,6 +108,71 @@ describe("Get user on /:id with get method", () => {
   });
 });
 
+// Get many users test
+describe("Get many users on / with get method", () => {
+
+  /* Define passing tests */
+  describe("Should pass when", () => {
+
+    test("When getting many users as admin - Should respond with 200", async () => {
+      const response = await request(app)
+        .get('/users')
+        .set('Authorization', `Bearer ${createdAccessToken}`);
+
+      // Expect statusCode 200
+      expect(response.statusCode).toBe(200);
+      expect(response.statusCode).not.toBe(404);
+    });
+  });
+});
+
+// Update existing user tests
+describe("Update user on /:id with patch method", () => {
+
+  /* Define passing tests */
+  describe("Should pass when", () => {
+
+    test("When given valid name and email for existing user - Should respond with 200", async () => {
+      const response = await request(app)
+        .patch(`/users/${createdId}`)
+        .send({
+          name: 'Peter Griffin',
+          email: 'peter@familyguy.com'
+        })
+        .set('Authorization', `Bearer ${createdAccessToken}`);
+
+      // Expect statusCode 200
+      expect(response.statusCode).toBe(200);
+      expect(response.statusCode).not.toBe(400);
+
+      // Expect respose body and id
+      const { password, ...responseBody } = data;
+      expect(response.body.data).toHaveProperty('id');
+      expect(response.body.data).toMatchObject({
+        ...responseBody,
+        name: 'Peter Griffin',
+        email: 'peter@familyguy.com'
+      });
+    });
+  });
+
+  /* Define failing tests */
+  describe("Should fail when", () => {
+
+    test("When given invalid email for existing user - Should respond with 400", async () => {
+      const response = await request(app)
+        .patch(`/users/${createdId}`)
+        .send({
+          email: 'test.test.com'
+        })
+        .set('Authorization', `Bearer ${createdAccessToken}`);
+
+      // Expect statusCode 400
+      expect(response.statusCode).toBe(400);
+      expect(response.statusCode).not.toBe(200);
+    });
+  });
+});
 
 // Delete existing user tests
 describe('Delete user on /:id with del method', () => {
