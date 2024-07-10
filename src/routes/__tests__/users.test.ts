@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json());
 app.use('/users', UserRouter);
 
-// Define test data
+// Define admin test data
 let createdId: User['id'];
 let createdAccessToken: User['access_token'];
 const data: Omit<User, 'id' | 'access_token'> = {
@@ -19,18 +19,28 @@ const data: Omit<User, 'id' | 'access_token'> = {
   role: 'ADMIN'
 };
 
+// Define user test data
+let standardUserId: User['id'];
+let standardUserAccessToken: User['access_token'];
+const standardData: Omit<User, 'id' | 'access_token'> = {
+  name: 'Standard Runner',
+  email: 'standard@runner.com',
+  password: 'standard1234',
+  role: 'USER'
+};
+
 // Define user route tests
 
 // Create new user tests
-describe("Create new user on / with post method", () => {
+describe("Create new user on / with POST method", () => {
 
   /* Define passing tests */
   describe("Given correct data", () => {
 
-    // Should save name, description and permissions to DB
+    // Should create ADMIN user and store data to DB
     // Should respond with status code 201
     // Should respond with json with id and request data
-    test("Should respond with status 201 and json data", async () => {
+    test("Create an ADMIN user - Should respond with 201", async () => {
       const response = await request(app)
         .post('/users')
         .send(data);
@@ -47,10 +57,48 @@ describe("Create new user on / with post method", () => {
       createdId = response.body.data.user.id;
       createdAccessToken = response.body.data.token;
     });
+
+    // Should create standard user and store data to DB
+    // Should respond with status code 201
+    // Should respond with json with id and request data
+    test("Create an ADMIN user - Should respond with 201", async () => {
+      const response = await request(app)
+        .post('/users')
+        .send(standardData);
+
+      // Expect statusCode 201
+      expect(response.statusCode).toBe(201);
+      expect(response.statusCode).not.toBe(400);
+
+      // Expect respose body and id
+      const { password, ...responseBody } = standardData;
+      expect(response.body.data.user).toHaveProperty('id');
+      expect(response.body.data.user).toMatchObject(responseBody);
+
+      standardUserId = response.body.data.user.id;
+      standardUserAccessToken = response.body.data.token;
+    });
   });
 
   /* Define failing tests */
   describe('Given invalid data', () => {
+
+    // Should fail to create user with existing email
+    // Should respond with status code 500
+    test("Fail to create user with existing email - Should respond with 500", async () => {
+      const response = await request(app)
+        .post('/users')
+        .send({
+          name: 'Existing email user',
+          email: 'test@runner.com',
+          password: 'password1234',
+          role: 'USER'
+        });
+
+      // Expect statusCode 201
+      expect(response.statusCode).toBe(500);
+      expect(response.statusCode).not.toBe(201);
+    });
 
     // Should fail to store data in DB becuase of validation
     // Should respond with status code 400
@@ -72,11 +120,13 @@ describe("Create new user on / with post method", () => {
 });
 
 // Get existing user tests
-describe("Get user on /:id with get method", () => {
+describe("Get user on /:id with GET method", () => {
 
   /* Define passing tests */
   describe("Shoud pass when", () => {
 
+    // Should retrieve same user data 
+    // Should respond with status code 200
     test("When given an existing user ID - Should respond with 200", async () => {
       const response = await request(app)
         .get(`/users/${createdId}`)
@@ -96,6 +146,8 @@ describe("Get user on /:id with get method", () => {
   /* Define failing tests */
   describe("Should fail when", () => {
 
+    // Should fail to find a user
+    // Should respond with status code 404
     test("When given a non-existant user ID - Should respond with 404", async () => {
       const response = await request(app)
         .get(`/users/1234-4567-890A`)
@@ -105,15 +157,30 @@ describe("Get user on /:id with get method", () => {
       expect(response.statusCode).toBe(404);
       expect(response.statusCode).not.toBe(200);
     });
+
+    // Should fail to get another user's data
+    // Should cause authentication error
+    // Should respond with 403
+    test("When accessing another user's data as standard user - Should respond with 403", async () => {
+      const response = await request(app)
+        .get(`/users/${createdId}`)
+        .set('Authorization', `Bearer ${standardUserAccessToken}`);
+
+      // Expect statusCode 403
+      expect(response.statusCode).toBe(403);
+      expect(response.statusCode).not.toBe(200);
+    });
   });
 });
 
 // Get many users test
-describe("Get many users on / with get method", () => {
+describe("Get many users on / with GET method", () => {
 
   /* Define passing tests */
   describe("Should pass when", () => {
 
+    // Should retrieve all users as admin
+    // Should respond with status code 200
     test("When getting many users as admin - Should respond with 200", async () => {
       const response = await request(app)
         .get('/users')
@@ -124,14 +191,33 @@ describe("Get many users on / with get method", () => {
       expect(response.statusCode).not.toBe(404);
     });
   });
+
+  /* Define failing tests */
+  describe("Should fail when", () => {
+
+    // Should fail to retrive all users as standard user
+    // Should cause authentication error
+    // Should respond with status code 403
+    test("When getting many users as standard user - Should respond with 403", async () => {
+      const response = await request(app)
+        .get('/users')
+        .set('Authorization', `Bearer ${standardUserAccessToken}`);
+
+      // Expect statusCode 403
+      expect(response.statusCode).toBe(403);
+      expect(response.statusCode).not.toBe(200);
+    })
+  });
 });
 
 // Update existing user tests
-describe("Update user on /:id with patch method", () => {
+describe("Update user on /:id with PATCH method", () => {
 
   /* Define passing tests */
   describe("Should pass when", () => {
 
+    // Should update user's name and email
+    // Should respond with status code 200
     test("When given valid name and email for existing user - Should respond with 200", async () => {
       const response = await request(app)
         .patch(`/users/${createdId}`)
@@ -159,6 +245,8 @@ describe("Update user on /:id with patch method", () => {
   /* Define failing tests */
   describe("Should fail when", () => {
 
+    // Should fail when updating with invalid email
+    // Should respond with status code 400
     test("When given invalid email for existing user - Should respond with 400", async () => {
       const response = await request(app)
         .patch(`/users/${createdId}`)
@@ -171,18 +259,36 @@ describe("Update user on /:id with patch method", () => {
       expect(response.statusCode).toBe(400);
       expect(response.statusCode).not.toBe(200);
     });
+
+    // Should fail to update another user's data
+    // Should cause authentication error
+    // Should respond with status code 403
+    test("When trying to update another user's data as standard user - Should respond with 403", async () => {
+      const response = await request(app)
+        .patch(`/users/${createdId}`)
+        .send({
+          email: 'test@test.com'
+        })
+        .set('Authorization', `Bearer ${standardUserAccessToken}`);
+
+      // Expect statusCode 403
+      expect(response.statusCode).toBe(403);
+      expect(response.statusCode).not.toBe(200);
+    });
   });
 });
 
 // Delete existing user tests
-describe('Delete user on /:id with del method', () => {
+describe('Delete user on /:id with DELETE method', () => {
 
   let toBeDeletedId: User['id'];
 
   /* Define passing tests */
   describe("Should pass when", () => {
 
-    test("Existing user and admin - Should respond with 204", async () => {
+    // Should delete another existing user as admin
+    // Should respond with staus code 204
+    test("When deleting existing user as admin - Should respond with 204", async () => {
 
       const user = await request(app)
         .post('/users')
@@ -199,7 +305,7 @@ describe('Delete user on /:id with del method', () => {
         .delete(`/users/${user.body.data.user.id}`)
         .set('Authorization', `Bearer ${createdAccessToken}`);
 
-      // Expect statusCode 203
+      // Expect statusCode 204
       expect(response.statusCode).toBe(204);
       expect(response.statusCode).not.toBe(404);
     })
@@ -208,26 +314,77 @@ describe('Delete user on /:id with del method', () => {
   /* Define failing tests */
   describe("Should fail when", () => {
 
-    test("Missing user and admin - Should respond with 404", async () => {
+    // Should fail to delete non-existant user as admin
+    // Should respond with status code 404
+    test("WWhen admin attempts to delete non-existant user - Should respond with 404", async () => {
       const response = await request(app)
         .delete(`/users/${toBeDeletedId}`)
         .set('Authorization', `Bearer ${createdAccessToken}`);
 
-      // Expect statusCode 203
+      // Expect statusCode 404
       expect(response.statusCode).toBe(404);
+      expect(response.statusCode).not.toBe(204);
+    });
+
+    // Should fail to delete own account as admin
+    // Should cause authentication error
+    // Should respond with status code 403
+    test("When ADMIN attempts to delete own user - Should respond with 403", async () => {
+      const response = await request(app)
+        .delete(`/users/${createdId}`)
+        .set('Authorization', `Bearer ${createdAccessToken}`);
+
+      // Expect statusCode 403
+      expect(response.statusCode).toBe(403);
+      expect(response.statusCode).not.toBe(204);
+    });
+
+    // Should fail to delete own account as USER
+    // Should cause authentication error
+    // Should respond with status code 403
+    test("When USER attempts to delete own user - Should respond with 403", async () => {
+      const response = await request(app)
+        .delete(`/users/${standardUserId}`)
+        .set('Authorization', `Bearer ${standardUserAccessToken}`);
+
+      // Expect statusCode 403
+      expect(response.statusCode).toBe(403);
+      expect(response.statusCode).not.toBe(204);
+    });
+
+    // Should fail to delete another account as USER
+    // Should cause authentication error
+    // Should respond with status code 403
+    test("When USER attempts to delete another user - Should respond with 403", async () => {
+      const response = await request(app)
+        .delete(`/users/${createdId}`)
+        .set('Authorization', `Bearer ${standardUserAccessToken}`);
+
+      // Expect statusCode 403
+      expect(response.statusCode).toBe(403);
       expect(response.statusCode).not.toBe(204);
     });
   });
 });
 
 
-/* Test cleanup - remove test user */
+/* Test cleanup - remove test users */
 describe("Should remove any leftover users created by tests", () => {
-  test("", async () => {
+
+  // Should successfuly delete ADMIN user
+  test("Delete ADMIN user", async () => {
     const prisma = new PrismaClient();
     const response = await prisma.user.delete({ where: { id: createdId } });
 
     expect(response.id).toBe(createdId);
+  });
+
+  // Should successfuly delete standard user
+  test("Delete standard user", async () => {
+    const prisma = new PrismaClient();
+    const response = await prisma.user.delete({ where: { id: standardUserId } });
+
+    expect(response.id).toBe(standardUserId);
   });
 });
 
